@@ -1,23 +1,25 @@
 import { VerifiableCredential } from "@web5/credentials";
 import { Web5 } from "@web5/api";
 import { webcrypto } from "node:crypto";
+import fetch from 'node-fetch';
 
 // @ts-ignore
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 // Store the customer's DID URI
-const customerDidUri = "did:dht:oubiyrhux5bupckyrb59de8hdr146jy41agjca94kyrxozth9jyo";
+const customerDidUri = "did:dht:tf7r6fp774cb19odcsatoawwawaq6t6et8cc1atord67qapnkrfy";
 
 // Method to ask customer DWN for authorization to store a credential
 async function requestForAuthorization(customerServerUrl, issuerDidUri) {
     try {
         const url = `${customerServerUrl}/authorize?issuerDid=${encodeURIComponent(issuerDidUri)}`;
+       console.log(url)
         const response = await fetch(url);
-
+        console.log(response)
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-
+     
         const result = await response.json();
         console.log("Authorization successful:", result);
         return result;
@@ -93,22 +95,16 @@ async function main() {
                 $actions: [ 
                     {
                         who: 'anyone',
-                        can: ['read']
+                        can: ['create', 'read']
                     },
                     {
                         role: 'issuer', 
-                        can: ['create']
-                    },
-                    {
-                        who: 'author',
-                        of: 'credential',
-                        can: ['create','delete', 'update']
-                    }, 
+                        can: ['create', 'read']
+                    }
                 ],
             }
         }
     };
-    
 
     // Install protocol on local DWN
     const { protocol, status} = await web5.dwn.protocols.configure({
@@ -122,8 +118,8 @@ async function main() {
     const customerServerUrl = "http://localhost:5001"; // Adjust this URL as needed
     console.log('Requesting authorization for', issuerDidUri)
     const authorizationRequestResults = await requestForAuthorization(customerServerUrl, issuerDidUri)
-    if (authorizationRequestResults.status == 202) {
-
+   
+    if (authorizationRequestResults.status.code == 200 || authorizationRequestResults.status.code == 202) {
         const { record, status } = await web5.dwn.records.create({
             data: credential_token,
             message: {
@@ -135,6 +131,8 @@ async function main() {
                 recipient: customerDidUri,
             },
         });
+
+        console.log(`Status code after you stored credential:`, status);
     }
 }
 
