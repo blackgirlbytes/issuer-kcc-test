@@ -13,15 +13,15 @@ const customerDidUri = "did:dht:tf7r6fp774cb19odcsatoawwawaq6t6et8cc1atord67qapn
 async function requestForAuthorization(customerServerUrl, issuerDidUri) {
     try {
         const url = `${customerServerUrl}/authorize?issuerDid=${encodeURIComponent(issuerDidUri)}`;
-       console.log(url)
+
         const response = await fetch(url);
-        console.log(response)
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
      
         const result = await response.json();
-        console.log("Authorization successful:", result);
+        console.log("Authorization successful:", {message: result.message, status: result.status});
         return result;
     } catch (error) {
         console.error("Error authorizing with customer:", error);
@@ -68,9 +68,9 @@ async function main() {
     const credential_token = await known_customer_credential.sign({
         did: issuerBearerDid, // Issuer's Bearer DID
     });
-    
-    console.log(JSON.stringify(known_customer_credential, null, 2));  
-    console.log(credential_token); 
+
+    console.log('Your credential:',JSON.stringify(known_customer_credential, null, 2) )
+    console.log('Your credential token:', credential_token); 
 
     // Get protocol definition via browser in hostURL/vc-protocol OR make api call 
     
@@ -115,10 +115,10 @@ async function main() {
     // Install protocol on remote DWN
     await protocol.send(issuerDidUri);
 
-    const customerServerUrl = "http://localhost:5001"; // Adjust this URL as needed
-    console.log('Requesting authorization for', issuerDidUri)
+    const customerServerUrl = "https://vc-to-dwn.tbddev.org"; // Adjust this URL as needed
+
     const authorizationRequestResults = await requestForAuthorization(customerServerUrl, issuerDidUri)
-   
+
     if (authorizationRequestResults.status.code == 200 || authorizationRequestResults.status.code == 202) {
         const { record, status } = await web5.dwn.records.create({
             data: credential_token,
@@ -132,7 +132,7 @@ async function main() {
             },
         });
 
-        console.log(`Status code after you stored credential:`, status);
+        console.log(`You successfully stored a credential in customer's DWN:`, status);
     }
 }
 
