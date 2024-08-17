@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 // Store the customer's DID URI
-const customerDidUri = "did:dht:tf7r6fp774cb19odcsatoawwawaq6t6et8cc1atord67qapnkrfy";
+const customerDidUri = "did:dht:844zdw7i36qw7yti7oudc3nddk5qjoafixarx3wq7kemtwi5d7uo";
 
 // Method to ask customer DWN for authorization to store a credential
 async function requestForAuthorization(customerServerUrl, issuerDidUri) {
