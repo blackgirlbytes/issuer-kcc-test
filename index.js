@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 // Store the customer's DID URI
-const customerDidUri = "did:dht:844zdw7i36qw7yti7oudc3nddk5qjoafixarx3wq7kemtwi5d7uo";
+const customerDidUri = "did:dht:rr1w5z9hdjtt76e6zmqmyyxc5cfnwjype6prz45m6z1qsbm8yjao";
 
 // Method to ask customer DWN for authorization to store a credential
 async function requestForAuthorization(customerServerUrl, issuerDidUri) {
@@ -29,9 +29,43 @@ async function requestForAuthorization(customerServerUrl, issuerDidUri) {
     }
 }
 
+// this will only query for records the issuer has created
+async function queryRecords(web5, vcProtocolDefinition) {
+    const { records, status } = await web5.dwn.records.query({
+        from: customerDidUri,
+        message: {
+            filter: {
+                dataFormat: 'application/vc+jwt',
+                protocol: vcProtocolDefinition.protocol,
+                protocolPath: 'credential',
+            },
+        },
+    });
+    const recordTexts = await Promise.all(records.map(async (record) => {
+        return await record.data.text();
+    }));
+    console.log('Here are your records:', recordTexts)
+
+    return { recordTexts, status };
+
+}
+
 async function main() {
     // connect to DWN
-    const { web5, did: issuerDidUri } = await Web5.connect();
+    const { web5, did: issuerDidUri } = await Web5.connect({
+        didCreateOptions: {
+            // Use community DWN instance hosted on Google Cloud
+            dwnEndpoints: ['https://dwn.gcda.xyz']
+          },
+          registration: {
+            onSuccess: () => {
+             console.log('Registration successful')
+            },
+            onFailure: (error) => {
+                console.error('Registration failed', error)
+            },
+          },
+    });
     // get issuer bearer did
     const { did: issuerBearerDid } = await web5.agent.identity.get({ didUri: issuerDidUri });
     // Create credential
@@ -85,22 +119,29 @@ async function main() {
             issuer: {
                 schema: "https://vc-to-dwn.tbddev.org/vc-protocol/schema/issuer",
                 dataFormats: ['text/plain']
+            },
+            judge: {
+                schema: "https://vc-to-dwn.tbddev.org/vc-protocol/schema/judge",
+                dataFormats: ['text/plain']
             }
         },
         structure: {
             issuer: {
                 $role: true,
             },
+            judge: {
+                $role: true,
+            },
             credential: {
-                $actions: [ 
+                $actions: [
                     {
-                        who: 'anyone',
-                        can: ['create', 'read']
+                        role: 'issuer',
+                        can: ['create']
                     },
                     {
-                        role: 'issuer', 
-                        can: ['create', 'read']
-                    }
+                        role: 'judge',
+                        can: ['query', 'read']
+                    },
                 ],
             }
         }
@@ -120,6 +161,7 @@ async function main() {
     const authorizationRequestResults = await requestForAuthorization(customerServerUrl, issuerDidUri)
 
     if (authorizationRequestResults.status.code == 200 || authorizationRequestResults.status.code == 202) {
+        // Store credential in customer's DWN
         const { record, status } = await web5.dwn.records.create({
             data: credential_token,
             message: {
@@ -131,9 +173,15 @@ async function main() {
                 recipient: customerDidUri,
             },
         });
+        
+        console.log(`You successfully stored a credential in customer's local DWN:`, status);
 
-        console.log(`You successfully stored a credential in customer's DWN:`, status);
+        // Immediately Store credential in customer's remote DWN
+         const { status: recordSendStatus } = await record.send(customerDidUri);
+         console.log('Record sent to remote DWNs:', recordSendStatus);
+
+        await queryRecords(web5, vcProtocolDefinition);
     }
 }
 
-main();
+main()
